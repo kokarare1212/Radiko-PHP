@@ -236,11 +236,10 @@ class Radiko
    * @param string $StationID
    * @param bool $AreaFree
    * @param bool $TimeFree
-   * @param bool $UseCache
    * @return array
    * @throws \GuzzleHttp\Exception\GuzzleException
    */
-  public function GetStreamBaseUrls(string $StationID, bool $AreaFree = false, bool $TimeFree = false, bool $UseCache = true): array{
+  public function GetStreamBaseUrls(string $StationID, bool $AreaFree = false, bool $TimeFree = false): array{
     $MatchedBaseUrls = [];
     if(!$this->IsAvailableStationID($StationID)){
       return $MatchedBaseUrls;
