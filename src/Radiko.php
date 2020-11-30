@@ -1,4 +1,8 @@
 <?php
+/*
+ * Copyright © 2020 kokarare1212 All right reserved.
+ */
+
 namespace kokarare1212;
 
 use GuzzleHttp\Client;
@@ -10,6 +14,11 @@ class Radiko
   function __construct(){
     $this->HttpClient = new Client();
   }
+  
+  /**
+   * @param string $StationID
+   * @return string
+   */
   public function GetAreaID4StationID(string $StationID): string{
     $Stations = $this->GetStations();
     foreach($Stations as $Station){
@@ -19,6 +28,12 @@ class Radiko
     }
     return "";
   }
+  
+  /**
+   * @param string|null $AreaID
+   * @return string
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
   public function GetAuthToken(string $AreaID=null): string{
     $auth1 = $this->HttpClient->get("https://radiko.jp/v2/api/auth1", [
       "headers" => [
@@ -57,6 +72,12 @@ class Radiko
     ]);
     return $AuthToken;
   }
+  
+  /**
+   * @param string $StationID
+   * @return string
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
   public function GetAuthToken4StationID(string $StationID): string{
     if(!$this->IsAvailableStationID($StationID)){
       return "";
@@ -64,6 +85,12 @@ class Radiko
     $AreaID = $this->GetAreaID4StationID($StationID);
     return $this->GetAuthToken($AreaID);
   }
+  
+  /**
+   * @param string $StationID
+   * @return array
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
   public function GetLivePrograms(string $StationID): array{
     $MatchedPrograms = [];
     if(!$this->IsAvailableStationID($StationID)){
@@ -107,6 +134,12 @@ class Radiko
     }
     return $MatchedPrograms;
   }
+  
+  /**
+   * @param string $StationID
+   * @return string
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
   public function GetLiveStream4Hls(string $StationID): string{
     if(!$this->IsAvailableStationID($StationID)){
       return "";
@@ -129,6 +162,12 @@ class Radiko
     $Playlist = $this->HttpClient->get($PlaylistUrls[0]);
     return $Playlist->getBody()->getContents();
   }
+  
+  /**
+   * @param string $StationID
+   * @return array
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
   public function GetLiveStreamInfo(string $StationID): array{
     $LiveStreamInfo = [];
     if(!$this->IsAvailableStationID($StationID)){
@@ -148,6 +187,10 @@ class Radiko
       "token" => $AuthToken,
     ];
   }
+  
+  /**
+   * @return array
+   */
   public function GetStationIDs(): array{
     $AvailableStations = $this->GetStations();
     $AvailableStationIDs = [];
@@ -156,6 +199,11 @@ class Radiko
     }
     return $AvailableStationIDs;
   }
+  
+  /**
+   * @return array
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
   public function GetStations(): array{
     $Response = $this->HttpClient->get("https://radiko.jp/v3/station/region/full.xml");
     $ResponseObject = simplexml_load_string($Response->getBody()->getContents());
@@ -183,6 +231,15 @@ class Radiko
     }
     return $AvailableStationIDs;
   }
+  
+  /**
+   * @param string $StationID
+   * @param bool $AreaFree
+   * @param bool $TimeFree
+   * @param bool $UseCache
+   * @return array
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
   public function GetStreamBaseUrls(string $StationID, bool $AreaFree = false, bool $TimeFree = false, bool $UseCache = true): array{
     $MatchedBaseUrls = [];
     if(!$this->IsAvailableStationID($StationID)){
@@ -197,9 +254,19 @@ class Radiko
     }
     return $MatchedBaseUrls;
   }
+  
+  /**
+   * @param string $AreaID
+   * @return string
+   */
   public function IsAvailableAreaID(string $AreaID): string{
     return (bool)preg_match("/JP[1-47]/", $AreaID);
   }
+  
+  /**
+   * @param string $StationID
+   * @return string
+   */
   public function IsAvailableStationID(string $StationID): string{
     $AvailableStationIDs = $this->GetStationIDs();
     return in_array($StationID, $AvailableStationIDs);
