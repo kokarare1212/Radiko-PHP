@@ -1,7 +1,15 @@
 <?php
-class Radiko{
+namespace kokarare1212;
+
+use GuzzleHttp\Client;
+
+class Radiko
+{
+  private $HttpClient;
   private $RadikoAppName = "aSmartPhone7o";
-  private $Cache = [];
+  function __construct(){
+    $this->HttpClient = new Client();
+  }
   public function GetAreaID4StationID(string $StationID): string{
     $Stations = $this->GetStations();
     foreach($Stations as $Station){
@@ -11,83 +19,43 @@ class Radiko{
     }
     return "";
   }
-  public function GetAuthToken(string $AreaID = ""): string{
-    $Auth1Curl = curl_init();
-    curl_setopt_array($Auth1Curl, [
-      CURLOPT_HEADER => true,
-      CURLOPT_HTTPHEADER => [
-        "X-Radiko-App: {$this->RadikoAppName}",
-        "X-Radiko-App-Version: 0.0.1",
-        "X-Radiko-Device: PHP.Radiko",
-        "X-Radiko-User: dummy_user",
+  public function GetAuthToken(string $AreaID=null): string{
+    $auth1 = $this->HttpClient->get("https://radiko.jp/v2/api/auth1", [
+      "headers" => [
+        "X-Radiko-App" => $this->RadikoAppName,
+        "X-Radiko-App-Version" => "0.0.1",
+        "X-Radiko-Device" => "PHP.Radiko",
+        "X-Radiko-User" => "dummy_user",
       ],
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_URL => "https://radiko.jp/v2/api/auth1",
     ]);
-    $Auth1Response = curl_exec($Auth1Curl);
-    $Auth1ResponseInfo = curl_getinfo($Auth1Curl);
-    curl_close($Auth1Curl);
-    $Auth1ResponseHeader = substr($Auth1Response, 0, (int)$Auth1ResponseInfo["header_size"]);
-    $Auth1ResponseHeaderArray = [];
-    if($Auth1ResponseInfo["http_code"] !== 200){
-      return "";
-    }
-    foreach(explode("\r\n", $Auth1ResponseHeader) as $Auth1ResponseHeaderLine){
-      $Header = explode(": ", $Auth1ResponseHeaderLine);
-      if(count($Header) !== 2){
-        continue;
-      }
-      if($Header[0] === "X-RADIKO-AUTHTOKEN"){
-        $Header[0] = "X-Radiko-AuthToken";
-      }
-      $Auth1ResponseHeaderArray[$Header[0]] = $Header[1];
-    }
-    $AuthToken = $Auth1ResponseHeaderArray["X-Radiko-AuthToken"];
-    $PartialKeyOffset = $Auth1ResponseHeaderArray["X-Radiko-KeyOffset"];
-    $PartialKeyLength = $Auth1ResponseHeaderArray["X-Radiko-KeyLength"];
-    $PartialKeyRaw = file_get_contents(dirname(__FILE__)."/{$this->RadikoAppName}.bin", false, null, $PartialKeyOffset, $PartialKeyLength);
-    $PartialKey = base64_encode($PartialKeyRaw);
-    $Auth2Curl = curl_init();
+    $AuthToken = $auth1->getHeader("X-Radiko-AuthToken")[0];
+    $PartialKeyOffset = (int)$auth1->getHeader("X-Radiko-KeyOffset")[0];
+    $PartialKeyLength = (int)$auth1->getHeader("X-Radiko-KeyLength")[0];
+    $PartialKey = base64_encode(
+      file_get_contents(dirname(__FILE__)."/key/{$this->RadikoAppName}.bin",
+      false, null, $PartialKeyOffset, $PartialKeyLength)
+    );
     if($this->IsAvailableAreaID($AreaID)){
-      $AreaCoordinates = json_decode(file_get_contents(dirname(__FILE__)."/coordinates.json"));
-      curl_setopt_array($Auth2Curl, [
-        CURLOPT_HEADER => true,
-        CURLOPT_HTTPHEADER => [
-          "X-Radiko-AuthToken: {$AuthToken}",
-          "X-Radiko-App: {$this->RadikoAppName}",
-          "X-Radiko-App-Version: 0.0.1",
-          "X-Radiko-Connection: wifi",
-          "X-Radiko-Device: PHP.Radiko",
-          "X-Radiko-Location: {$AreaCoordinates->$AreaID[0]},{$AreaCoordinates->$AreaID[1]},gps",
-          "X-Radiko-PartialKey: {$PartialKey}",
-          "X-Radiko-User: dummy_user",
-        ],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_URL => "https://radiko.jp/v2/api/auth2",
-      ]);
+      $CoordinatesList = json_decode(
+        file_get_contents(dirname(__FILE__)."/json/coordinates.json")
+      );
+      $Coordinate = "{$CoordinatesList->$AreaID[0]},{$CoordinatesList->$AreaID[1]},gps";
     } else {
-      curl_setopt_array($Auth2Curl, [
-        CURLOPT_HEADER => true,
-        CURLOPT_HTTPHEADER => [
-          "X-Radiko-AuthToken: {$AuthToken}",
-          "X-Radiko-App: {$this->RadikoAppName}",
-          "X-Radiko-App-Version: 0.0.1",
-          "X-Radiko-Device: PHP.Radiko",
-          "X-Radiko-PartialKey: {$PartialKey}",
-          "X-Radiko-User: dummy_user",
-        ],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_URL => "https://radiko.jp/v2/api/auth2",
-      ]);
+      $Coordinate = "";
     }
-    curl_exec($Auth2Curl);
-    $Auth2ResponseInfo = curl_getinfo($Auth2Curl);
-    curl_close($Auth2Curl);
-    if($Auth2ResponseInfo["http_code"] === 200){
-      return $AuthToken;
-    } else {
-      return "";
-    }
+    $auth2 = $this->HttpClient->get("https://radiko.jp/v2/api/auth2", [
+      "headers" => [
+        "X-Radiko-App" => $this->RadikoAppName,
+        "X-Radiko-AuthToken" => $AuthToken,
+        "X-Radiko-App-Version" => "0.0.1",
+        "X-Radiko-Connection" => "wifi",
+        "X-Radiko-Device" => "PHP.Radiko",
+        "X-Radiko-Location" => $Coordinate,
+        "X-Radiko-PartialKey" => $PartialKey,
+        "X-Radiko-User" => "dummy_user",
+      ]
+    ]);
+    return $AuthToken;
   }
   public function GetAuthToken4StationID(string $StationID): string{
     if(!$this->IsAvailableStationID($StationID)){
@@ -102,14 +70,8 @@ class Radiko{
       return $MatchedPrograms;
     }
     $AreaID = $this->GetAreaID4StationID($StationID);
-    $Curl = curl_init();
-    curl_setopt_array($Curl, [
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_URL => "https://radiko.jp/v3/program/now/{$AreaID}.xml",
-    ]);
-    $Response = curl_exec($Curl);
-    curl_close($Curl);
-    $ResponseObject = simplexml_load_string($Response);
+    $Response = $this->HttpClient->get("https://radiko.jp/v3/program/now/{$AreaID}.xml");
+    $ResponseObject = simplexml_load_string($Response->getBody()->getContents());
     $i = 0;
     foreach($ResponseObject->stations->station as $Station){
       if((string)$Station->attributes()["id"] === $StationID){
@@ -150,18 +112,13 @@ class Radiko{
       return "";
     }
     $StreamInfo = $this->GetLiveStreamInfo($StationID);
-    $ChunkCurl = curl_init();
-    curl_setopt_array($ChunkCurl, [
-      CURLOPT_HTTPHEADER => [
-        "X-Radiko-AuthToken: {$StreamInfo["token"]}",
-      ],
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_URL => $StreamInfo["url"],
+    $Chunk = $this->HttpClient->get($StreamInfo["url"], [
+      "headers" => [
+        "X-Radiko-AuthToken" => $StreamInfo["token"],
+      ]
     ]);
-    $ChunkResponse = curl_exec($ChunkCurl);
-    curl_close($ChunkCurl);
     $PlaylistUrls = [];
-    foreach(explode("\n", $ChunkResponse) as $ChunkLine){
+    foreach(explode("\n", $Chunk->getBody()->getContents()) as $ChunkLine){
       if($this->StartsWith("http://", $ChunkLine) || $this->StartsWith("https://", $ChunkLine)){
         $PlaylistUrls[] = $ChunkLine;
       }
@@ -169,13 +126,8 @@ class Radiko{
     if(empty($PlaylistUrls)){
       return "";
     }
-    $PlaylistCurl = curl_init();
-    curl_setopt_array($PlaylistCurl, [
-      CURLOPT_RETURNTRANSFER => true,
-      CURLOPT_URL => $PlaylistUrls[0],
-    ]);
-    $PlaylistResponse = curl_exec($PlaylistCurl);
-    return $PlaylistResponse;
+    $Playlist = $this->HttpClient->get($PlaylistUrls[0]);
+    return $Playlist->getBody()->getContents();
   }
   public function GetLiveStreamInfo(string $StationID): array{
     $LiveStreamInfo = [];
@@ -204,20 +156,9 @@ class Radiko{
     }
     return $AvailableStationIDs;
   }
-  public function GetStations(bool $UseCache = true): array{
-    if(isset($this->Cache["v3_station_region_full_xml"]) && $UseCache){
-      $Response = $this->Cache["v3_station_region_full_xml"];
-    } else {
-      $Curl = curl_init();
-      curl_setopt_array($Curl, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_URL => "https://radiko.jp/v3/station/region/full.xml",
-      ]);
-      $Response = curl_exec($Curl);
-      curl_close($Curl);
-      $this->Cache["v3_station_region_full_xml"] = $Response;
-    }
-    $ResponseObject = simplexml_load_string($Response);
+  public function GetStations(): array{
+    $Response = $this->HttpClient->get("https://radiko.jp/v3/station/region/full.xml");
+    $ResponseObject = simplexml_load_string($Response->getBody()->getContents());
     $AvailableStationIDs = [];
     $i = 0;
     foreach($ResponseObject as $Stations){
@@ -247,19 +188,8 @@ class Radiko{
     if(!$this->IsAvailableStationID($StationID)){
       return $MatchedBaseUrls;
     }
-    if(isset($this->Cache["v3_station_stream_{$this->RadikoAppName}_{$StationID}_xml"]) && $UseCache){
-      $Response = $this->Cache["v3_station_stream_{$this->RadikoAppName}_{$StationID}_xml"];
-    } else {
-      $Curl = curl_init();
-      curl_setopt_array($Curl, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_URL => "https://radiko.jp/v3/station/stream/{$this->RadikoAppName}/{$StationID}.xml",
-      ]);
-      $Response = curl_exec($Curl);
-      curl_close($Curl);
-      $this->Cache["v3_station_stream_{$this->RadikoAppName}_{$StationID}_xml"] = $Response;
-    }
-    $ResponseObject = simplexml_load_string($Response);
+    $Response = $this->HttpClient->get("https://radiko.jp/v3/station/stream/{$this->RadikoAppName}/{$StationID}.xml");
+    $ResponseObject = simplexml_load_string($Response->getBody()->getContents());
     foreach($ResponseObject->url as $EntriedUrlElement){
       if((bool)((integer)$EntriedUrlElement->attributes()["areafree"]) === $AreaFree && (bool)((integer)$EntriedUrlElement->attributes()["timefree"]) === $TimeFree){
         $MatchedBaseUrls[] = (string)$EntriedUrlElement->playlist_create_url;
@@ -267,10 +197,10 @@ class Radiko{
     }
     return $MatchedBaseUrls;
   }
-  public function IsAvailableAreaID(string $AreaID): bool{
+  public function IsAvailableAreaID(string $AreaID): string{
     return (bool)preg_match("/JP[1-47]/", $AreaID);
   }
-  public function IsAvailableStationID(string $StationID): bool{
+  public function IsAvailableStationID(string $StationID): string{
     $AvailableStationIDs = $this->GetStationIDs();
     return in_array($StationID, $AvailableStationIDs);
   }
