@@ -1,6 +1,6 @@
 {
   "name": "kokarare1212/radiko",
-  "description": "Radiko's unofficial library made of PHP",
+  "description": "PHPで作られたradikoの非公式ライブラリ",
   "minimum-stability": "stable",
   "license": "Apache-2.0",
   "authors": [
