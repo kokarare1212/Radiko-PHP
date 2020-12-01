@@ -174,7 +174,7 @@ class Radiko
       return $LiveStreamInfo;
     }
     $AuthToken = $this->GetAuthToken4StationID($StationID);
-    $BaseUrl = $this->GetStreamBaseUrls($StationID)[0];
+    $BaseUrl = $this->GetStreamBaseUrls($StationID, false, false)[0];
     $UrlParam = http_build_query([
       "station_id" => $StationID,
       "l" => 15,
@@ -198,6 +198,67 @@ class Radiko
       $AvailableStationIDs[] = $Station["id"];
     }
     return $AvailableStationIDs;
+  }
+  
+  /**
+   * @param string $StationID
+   * @param string $StartAt
+   * @param string $EndAt
+   * @return string
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
+  public function GetStream4Hls(string $StationID, string $StartAt, string $EndAt): string{
+    if(!$this->IsAvailableStationID($StationID)){
+      return "";
+    }
+    $StreamInfo = $this->GetStreamInfo($StationID, $StartAt, $EndAt);
+    $Chunk = $this->HttpClient->get($StreamInfo["url"], [
+      "headers" => [
+        "X-Radiko-AuthToken" => $StreamInfo["token"],
+      ]
+    ]);
+    $PlaylistUrls = [];
+    foreach(explode("\n", $Chunk->getBody()->getContents()) as $ChunkLine){
+      if($this->StartsWith("http://", $ChunkLine) || $this->StartsWith("https://", $ChunkLine)){
+        $PlaylistUrls[] = $ChunkLine;
+      }
+    }
+    if(empty($PlaylistUrls)){
+      return "";
+    }
+    $Playlist = $this->HttpClient->get($PlaylistUrls[0]);
+    return $Playlist->getBody()->getContents();
+  }
+  
+  /**
+   * @param string $StationID
+   * @param string $StartAt
+   * @param string $EndAt
+   * @return array
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
+  public function GetStreamInfo(string $StationID, string $StartAt, string $EndAt): array{
+    $StreamInfo = [];
+    if(!$this->IsAvailableStationID($StationID)){
+      return $StreamInfo;
+    }
+    $AuthToken = $this->GetAuthToken4StationID($StationID);
+    $BaseUrl = $this->GetStreamBaseUrls($StationID, false, true)[0];
+    $UrlParam = http_build_query([
+      "station_id" => $StationID,
+      "start_at" => $StartAt,
+      "ft" => $StartAt,
+      "end_at" => $EndAt,
+      "to" => $EndAt,
+      "l" => 15,
+      "lsid" => "",
+      "type" => "b",
+    ]);
+    $StreamUrl = $BaseUrl."?".$UrlParam;
+    return [
+      "url" => $StreamUrl,
+      "token" => $AuthToken,
+    ];
   }
   
   /**
@@ -267,7 +328,7 @@ class Radiko
     $Response = $this->HttpClient->get("https://radiko.jp/v3/program/station/weekly/{$StationID}.xml");
     $ResponseObject = simplexml_load_string($Response->getBody()->getContents());
     $i = 0;
-    foreach($ResponseObject->radiko->stations->station->progs as $Programs){
+    foreach($ResponseObject->stations->station->progs as $Programs){
       foreach($Programs->prog as $Program){
         $WeeklyPrograms[$i] = [];
         $WeeklyPrograms[$i]["id"] = (string)$Program->attributes()["id"];
