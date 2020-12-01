@@ -255,6 +255,52 @@ class Radiko
   }
   
   /**
+   * @param string $StationID
+   * @return array
+   * @throws \GuzzleHttp\Exception\GuzzleException
+   */
+  public function GetWeeklyPrograms(string $StationID): array{
+    $WeeklyPrograms = [];
+    if(!$this->IsAvailableStationID($StationID)){
+      return $WeeklyPrograms;
+    }
+    $Response = $this->HttpClient->get("https://radiko.jp/v3/program/station/weekly/{$StationID}.xml");
+    $ResponseObject = simplexml_load_string($Response->getBody()->getContents());
+    $i = 0;
+    foreach($ResponseObject->radiko->stations->station->progs as $Programs){
+      foreach($Programs->prog as $Program){
+        $WeeklyPrograms[$i] = [];
+        $WeeklyPrograms[$i]["id"] = (string)$Program->attributes()["id"];
+        $WeeklyPrograms[$i]["ft"] = (string)$Program->attributes()["ft"];
+        $WeeklyPrograms[$i]["to"] = (string)$Program->attributes()["to"];
+        $WeeklyPrograms[$i]["ftl"] = (string)$Program->attributes()["ftl"];
+        $WeeklyPrograms[$i]["tol"] = (string)$Program->attributes()["tol"];
+        $WeeklyPrograms[$i]["dur"] = (string)$Program->attributes()["dur"];
+        $WeeklyPrograms[$i]["title"] = (string)$Program->title;
+        $WeeklyPrograms[$i]["url"] = (string)$Program->url;
+        $WeeklyPrograms[$i]["failed_record"] = (bool)((string)$Program->failed_record);
+        $WeeklyPrograms[$i]["ts_in_ng"] = (bool)((string)$Program->ts_in_ng);
+        $WeeklyPrograms[$i]["ts_out_ng"] = (bool)((string)$Program->ts_out_ng);
+        $WeeklyPrograms[$i]["desc"] = (string)$Program->desc;
+        $WeeklyPrograms[$i]["info"] = (string)$Program->info;
+        $WeeklyPrograms[$i]["pfm"] = (string)$Program->pfm;
+        $WeeklyPrograms[$i]["img"] = (string)$Program->img;
+        $WeeklyPrograms[$i]["tag"] = (string)$Program->tag;
+        $WeeklyPrograms[$i]["genre"] = (string)$Program->genre;
+        $WeeklyPrograms[$i]["meta"] = [];
+        $j = 0;
+        foreach($Program->metas->meta as $Meta){
+          $WeeklyPrograms[$i]["meta"][$j]["name"] = (string)$Meta->name;
+          $WeeklyPrograms[$i]["meta"][$j]["value"] = (string)$Meta->value;
+          $j++;
+        }
+        $i++;
+      }
+    }
+    return $WeeklyPrograms;
+  }
+  
+  /**
    * @param string $AreaID
    * @return string
    */
